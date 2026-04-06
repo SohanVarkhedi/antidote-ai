@@ -415,23 +415,54 @@ footer{border-top:1px solid var(--border);padding:32px 52px;display:grid;grid-te
 
 <!-- ML DEMO -->
 <section id="ml-demo" class="demo-section">
-  <div class="sl reveal">Interactive Defense</div>
-  <h2 class="st reveal rd1">Try the <span style="color:var(--blue2)">model.</span></h2>
-  <p class="reveal rd2" style="font-size:.95rem;color:var(--muted);margin-top:14px;max-width:520px;line-height:1.75">Upload an input, trigger an adversarial attack, watch ANTIDOTE neutralize it in real time — powered by the ML model built by our team's ML engineer.</p>
+  
   <div class="demo-grid">
-    <div class="demo-panel reveal rd1">
+
+    <div class="demo-panel">
       <div class="demo-ph">
         <div class="demo-ring">🤖</div>
-        <div class="demo-title">ML Model Interface</div>
-        <div class="demo-sub">Reserved for the live adversarial robustness demo — powered by the ML model built by the team's ML engineer.</div>
-        <div class="demo-badge"><div class="demo-bdot"></div>Awaiting ML model integration</div>
+        <div class="demo-title">Secure AI Wrapper Demo</div>
+
+        <button class="btn-p" onclick="runAntidoteDemo()">
+          Run Defense
+        </button>
+
+        <div style="margin-top:20px;text-align:left;font-family:monospace;">
+          <p>Prediction: <span id="prediction">-</span></p>
+          <p>Confidence: <span id="confidence">-</span></p>
+          <p>Status: <span id="anomaly">-</span></p>
+        </div>
       </div>
     </div>
+
     <div class="demo-cards">
-      <div class="demo-card reveal rd1"><div class="demo-ct">What happens here</div><div class="demo-ch">Attack → Defend → Result</div><div class="demo-cb">Input a data point. Select an attack — PGD, FGSM, or Backdoor. Watch ANTIDOTE's layers fire: anomaly detection, purification, certified defense. See the protected prediction vs the raw model output.</div></div>
-      <div class="demo-card reveal rd2"><div class="demo-ct">The ML Model</div><div class="demo-ch">Adversarially trained classifier</div><div class="demo-cb">Built and trained by our ML engineer using PGD-based adversarial training. ANTIDOTE wraps it with the six-layer defense pipeline shown throughout this site.</div></div>
-      <div class="demo-card reveal rd3"><div class="demo-ct">Hackathon Context</div><div class="demo-ch">Problem: Adversarially robust AI</div><div class="demo-cb">This project addresses building AI systems resilient to evasion and poisoning — a critical unsolved problem in deployed AI safety across healthcare, autonomous systems, and defense.</div></div>
+      <div class="demo-card reveal rd1">
+        <div class="demo-ct">What happens here</div>
+        <div class="demo-ch">Attack → Defend → Result</div>
+        <div class="demo-cb">
+          Input a data point. ANTIDOTE runs anomaly detection, validation,
+          preprocessing and returns a protected prediction.
+        </div>
+      </div>
+
+      <div class="demo-card reveal rd2">
+        <div class="demo-ct">The ML Model</div>
+        <div class="demo-ch">Secure wrapper integration</div>
+        <div class="demo-cb">
+          Your backend SecureAIWrapper validates input,
+          detects anomalies and logs suspicious samples.
+        </div>
+      </div>
+
+      <div class="demo-card reveal rd3">
+        <div class="demo-ct">Defense Pipeline</div>
+        <div class="demo-ch">Validator → Detector → Model</div>
+        <div class="demo-cb">
+          Full plug-and-play AI defense middleware working live.
+        </div>
+      </div>
     </div>
+
   </div>
 </section>
 
@@ -719,6 +750,30 @@ st.start(0);
 document.querySelectorAll('[string-repeat]').forEach(el=>{
   new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('-inview');});},{threshold:.12}).observe(el);
 });
+async function runAntidoteDemo() {
+    try {
+        const response = await fetch("http://127.0.0.1:8000/predict", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                input: [5.1, 3.5, 1.4, 0.2]
+            })
+        });
+
+        const data = await response.json();
+
+        document.getElementById("prediction").innerText = data.prediction;
+        document.getElementById("confidence").innerText =
+            data.confidence ? data.confidence.toFixed(3) : "N/A";
+        document.getElementById("anomaly").innerText =
+            data.is_anomaly ? "⚠️ Anomaly Detected" : "Normal";
+
+    } catch (err) {
+        console.error(err);
+    }
+}
 </script>
 </body>
 </html>
