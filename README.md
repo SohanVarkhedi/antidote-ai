@@ -1,269 +1,262 @@
----
+# 🛡️ Antidote-AI
 
-# 🛡️ Antidote AI — Adversarial Data Defense for ML Models
+**Adversarially Robust AI Security Middleware**
 
-Antidote AI is an **AI Security Middleware** that protects machine learning models from **data poisoning, adversarial attacks, and evasion attempts** before training or inference.
-
-It acts as a **defensive layer** between your dataset and your ML model.
-
----
-
-## 🚀 What Problem Does It Solve?
-
-Machine learning models can be manipulated by:
-
-* Poisoned datasets
-* Adversarial samples
-* Noisy or malicious inputs
-* Data drift & anomalies
-* Evasion attacks during inference
-
-**Antidote AI detects and filters these threats BEFORE they affect your model.**
+Antidote-AI is a multi-layer AI security middleware designed to protect machine learning systems against **data poisoning attacks**, **evasion attacks**, and **distribution drift**.
+It sanitizes training data, monitors inference inputs, and provides explainable risk-based decisions.
 
 ---
 
-## ⚙️ How It Works
+# 🚀 Features
 
-```
-User Uploads Dataset (CSV / Excel)
-            ↓
-     Data Preprocessing
-            ↓
-  ┌────────────────────────────┐
-  │   Defense Ensemble Engine  │
-  │                            │
-  │  1. Isolation Forest       │
-  │  2. Autoencoder Detector   │
-  │  3. Statistical Validator  │
-  └────────────────────────────┘
-            ↓
-      Risk Scoring Engine
-            ↓
- Clean Data + Threat Report
-            ↓
-      Safe Model Training
-```
+### 🔐 Training-Time Protection
+
+* Dataset upload (CSV / Excel)
+* Poisoning detection using Isolation Forest
+* Automatic removal of suspicious rows
+* Clean dataset generation
+* Download cleaned dataset
+
+### 🧠 Model Training
+
+* Ensemble base models:
+
+  * RandomForest
+  * LogisticRegression
+  * GradientBoosting
+* Training only on sanitized data
+* Model persistence
+
+### 🚨 Inference-Time Protection
+
+* Input validation
+* Multi-model evasion detection:
+
+  * One-Class SVM
+  * Isolation Forest
+  * Z-score statistical detection
+* Ensemble anomaly decision
+
+### 🌊 Drift Detection
+
+* Detects distribution shift between training and incoming data
+* Statistical comparison using KS-test
+
+### 📊 Risk Scoring Engine
+
+* Weighted risk calculation
+* Severity classification:
+
+  * LOW
+  * MEDIUM
+  * HIGH
+
+### 📥 Clean Dataset Download
+
+* Users can download cleaned dataset after poisoning removal
+
+### 📝 Logging System
+
+* Poisoning attempts
+* Evasion attempts
+* Final decisions
+* Risk scores
+
+### 🔍 Explainability
+
+* Displays reason for blocking
+* Feature deviation explanation
 
 ---
 
-## 🧠 Models Used
+# 🧠 System Architecture
 
-### 1️⃣ Isolation Forest
+Training Phase:
+Dataset Upload → Poisoning Detection → Clean Dataset → Model Training
 
-* Detects outliers
-* Prevents data poisoning
-* Identifies abnormal samples
-
-### 2️⃣ Autoencoder (Neural Network)
-
-* Learns normal data distribution
-* Flags adversarial examples
-* Detects evasion attempts
-
-### 3️⃣ Statistical Validator
-
-* Z-score filtering
-* Distribution shift detection
-* Feature anomaly detection
+Inference Phase:
+Input → Validator → Evasion Ensemble → Drift Detection → Model Ensemble → Risk Engine → Decision
 
 ---
 
-## 📊 Output
+# 🧩 Evasion Detection Ensemble
 
-After uploading a dataset, Antidote AI provides:
+Antidote-AI uses multiple anomaly detectors:
 
-* Cleaned Dataset
-* Threat Score (0–100)
-* Anomaly Count
-* Risk Level (Low / Medium / High)
-* Removed Malicious Rows
-* Visualization Dashboard
+* One-Class SVM (boundary anomalies)
+* Isolation Forest (outlier detection)
+* Z-score detection (statistical deviation)
+
+Voting-based ensemble improves detection accuracy.
 
 ---
 
-## 🧪 Example
+# 📊 Risk Score Formula
 
-Input:
+Risk score calculated using weighted components:
 
-```
-dataset.csv (10,000 rows)
-```
+risk =
+0.25 * poisoning_score +
+0.25 * evasion_score +
+0.25 * drift_score +
+0.25 * model_confidence
 
 Output:
 
-```
-✔ Clean Samples: 9,423
-⚠ Suspicious Samples: 577
-🛡 Threat Score: 18.4%
-🔴 Risk Level: Medium
-```
+* Risk Score (0–100)
+* Severity Level
+* Final Decision
 
 ---
 
-## 🏗️ Tech Stack
+# 📁 Folder Structure
 
-### Frontend
-
-* React.js
-* Tailwind CSS
-* Framer Motion
-* Recharts (graphs)
-
-### Backend
-
-* FastAPI
-* Python
-* Scikit-learn
-* TensorFlow / PyTorch
-* Pandas / NumPy
-
-### Models
-
-* Isolation Forest
-* Autoencoder
-* Statistical Detection Engine
-
-### DevOps
-
-* Docker
-* GitHub Actions
-* Uvicorn
-
----
-
-## 📁 Project Structure
-
-```
 antidote-ai/
 │
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── charts/
-│   │   └── App.js
-│
 ├── backend/
-│   ├── main.py
-│   ├── routes/
-│   ├── models/
-│   │   ├── isolation_forest.py
-│   │   ├── autoencoder.py
-│   │   └── statistical.py
-│   ├── utils/
-│   └── services/
+│   ├── poisoning_detector.py
+│   ├── evasion_ensemble.py
+│   ├── drift_detector.py
+│   ├── validator.py
+│   ├── ensemble_models.py
+│   ├── risk_engine.py
+│   ├── logger.py
+│   ├── explainability.py
 │
-├── datasets/
-├── reports/
-├── requirements.txt
-├── dockerfile
-└── README.md
-```
+├── models/
+│
+├── uploads/
+│
+├── logs/
+│
+├── frontend/
+│   ├── index.html
+│   ├── style.css
+│   ├── script.js
+│
+├── app.py
+└── requirements.txt
 
 ---
 
-## 🔐 Attacks Prevented
+# 🔌 API Endpoints
 
-| Attack Type         | Prevented By          |
-| ------------------- | --------------------- |
-| Data Poisoning      | Isolation Forest      |
-| Adversarial Samples | Autoencoder           |
-| Noise Injection     | Statistical Validator |
-| Model Evasion       | Ensemble Detection    |
-| Distribution Shift  | Risk Engine           |
+POST /upload
+Upload dataset and detect poisoning
+
+GET /download-cleaned
+Download sanitized dataset
+
+POST /train
+Train ensemble models
+
+POST /predict
+Secure prediction pipeline
 
 ---
 
-## 🚀 Installation
+# 🖥️ UI Sections
 
-```bash
-git clone https://github.com/yourusername/antidote-ai.git
-cd antidote-ai
-```
+1. Hero Section
+2. Dataset Upload Panel
+3. Train Model Panel
+4. Inference Input Panel
+5. Security Dashboard
 
-Install backend dependencies:
+Dashboard displays:
 
-```bash
+* Poisoning risk
+* Evasion risk
+* Drift status
+* Model prediction
+* Risk score
+* Final decision
+
+---
+
+# 🧰 Tech Stack
+
+Backend:
+
+* Python
+* Flask
+* scikit-learn
+* pandas
+* numpy
+* scipy
+* joblib
+
+Frontend:
+
+* HTML
+* CSS (Bauhaus Design System)
+* JavaScript
+
+Models:
+
+* IsolationForest
+* OneClassSVM
+* RandomForest
+* LogisticRegression
+* GradientBoosting
+
+---
+
+# ⚙️ Installation
+
+Clone repository:
+
+git clone <repo-url>
+
+Install dependencies:
+
 pip install -r requirements.txt
-```
 
-Run backend:
+Run server:
 
-```bash
-uvicorn main:app --reload
-```
+python app.py
 
-Run frontend:
+Open frontend:
 
-```bash
-cd frontend
-npm install
-npm start
-```
+http://localhost:5000
 
 ---
 
-## 📤 Usage
+# 📥 Dataset Format
 
-1. Upload dataset (CSV / Excel)
-2. Click **Scan**
-3. Antidote AI analyzes dataset
-4. View threat score
-5. Download cleaned dataset
-6. Train your model safely
+CSV format:
+
+feature1, feature2, feature3, label
 
 ---
 
-## 📈 Features
+# 🛡️ Decision Logic
 
-* Dataset Threat Detection
-* Risk Scoring
-* Anomaly Visualization
-* Clean Data Export
-* Ensemble Defense Models
-* Real-time Scan UI
-* Model Protection Layer
+BLOCK → High risk malicious input
+FLAG → Suspicious input detected
+ALLOW → Safe input
 
 ---
 
-## 🎯 Use Cases
+# 🌟 Key Capabilities
 
-* Secure ML pipelines
-* Research datasets validation
-* AI security projects
-* Kaggle dataset cleaning
-* Enterprise ML defense
-* Academic projects
-
----
-
-## 🔮 Future Improvements
-
-* Real-time inference protection
-* API gateway middleware
-* Adversarial training module
-* Model robustness scoring
-* LLM prompt injection defense
+✔ Training data sanitization
+✔ Multi-model evasion detection
+✔ Drift monitoring
+✔ Ensemble model prediction
+✔ Risk-based decision making
+✔ Clean dataset export
+✔ Explainable security output
+✔ Logging & monitoring
 
 ---
 
-## 👨‍💻 Authors
+# 🎯 Project Goal
 
-**Antidote AI Team**
-AI Security Middleware Project
-
----
-
-## 📜 License
-
-MIT License
+To provide a **robust AI middleware** that secures machine learning systems against adversarial threats across both training and inference phases.
 
 ---
 
-## ⭐ If you like this project
+# 👨‍💻 Authors
 
-Give it a ⭐ on GitHub and help make AI safer.
-
----
-
-
+Antidote-AI Security Middleware Project
