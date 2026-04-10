@@ -3,9 +3,10 @@ Antidote AI — Flask Application
 Adversarially Robust AI Security Middleware
 
 Endpoints:
-    POST /upload   – Upload CSV, detect poisoning, return stats
-    POST /train    – Train base model on cleaned data
-    POST /predict  – Run full defense pipeline on new input
+    POST /upload         – Upload CSV, detect poisoning, save cleaned dataset
+    GET  /download-cleaned – Download cleaned CSV after poisoning removal
+    POST /train          – Train ensemble models on cleaned data
+    POST /predict        – Run full defense pipeline on new input
 """
 
 import os
@@ -13,7 +14,7 @@ import json
 import pandas as pd
 import numpy as np
 import joblib
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 
 from backend.poisoning_detector import detect_poisoning
@@ -21,6 +22,11 @@ from backend.train_model import train_model
 from backend.evasion_detector import EvasionDetector
 from backend.validator import validate_input
 from backend.ensemble import ensemble_decision
+from backend.ensemble_models import train_ensemble
+from backend.drift_detector import DriftDetector
+from backend.risk_engine import calculate_risk
+from backend.explainability import explain
+from backend.logger import log_poisoning, log_evasion, log_decision
 
 # ── Paths ─────────────────────────────────────────────────────────
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -41,6 +47,7 @@ state = {
     "poisoning_result": None,  # dict from poisoning detector
     "model_info": None,        # dict from training step
     "evasion_detector": EvasionDetector(),
+    "drift_detector": DriftDetector(),
 }
 
 # ══════════════════════════════════════════════════════════════════
@@ -89,7 +96,37 @@ def upload_dataset():
         "suspicious_indices": result["suspicious_indices"],
     }
 
+    # Save cleaned dataset to CSV for download
+    cleaned_csv_path = os.path.join(UPLOAD_DIR, "cleaned_dataset.csv")
+    result["cleaned_df"].to_csv(cleaned_csv_path, index=False)
+
+    # Log poisoning event
+    log_poisoning(
+        total_rows=result["total_rows"],
+        suspicious_rows=result["suspicious_rows"],
+        cleaned_rows=result["cleaned_rows"],
+        filename=file.filename,
+    )
+
     return jsonify(state["poisoning_result"])
+
+
+# ══════════════════════════════════════════════════════════════════
+#  GET /download-cleaned
+# ══════════════════════════════════════════════════════════════════
+
+@app.route("/download-cleaned", methods=["GET"])
+def download_cleaned():
+    cleaned_path = os.path.join(UPLOAD_DIR, "cleaned_dataset.csv")
+    if not os.path.exists(cleaned_path):
+        return jsonify({"error": "No cleaned dataset available. Upload a dataset first."}), 404
+
+    return send_file(
+        cleaned_path,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="cleaned_dataset.csv",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -108,10 +145,17 @@ def train():
     if target_col not in cleaned_df.columns:
         target_col = cleaned_df.columns[-1]
 
+    # ── Train ensemble models ─────────────────────────────────
     try:
-        info = train_model(cleaned_df, target_column=target_col)
+        info = train_ensemble(cleaned_df, target_column=target_col)
     except Exception as e:
-        return jsonify({"error": f"Training failed: {e}"}), 500
+        return jsonify({"error": f"Ensemble training failed: {e}"}), 500
+
+    # ── Also train legacy base model for backward compat ──────
+    try:
+        train_model(cleaned_df, target_column=target_col)
+    except Exception:
+        pass  # Non-critical if ensemble succeeds
 
     state["model_info"] = info
 
@@ -120,11 +164,16 @@ def train():
     state["evasion_detector"].fit(X_clean.values)
     state["evasion_detector"].save()
 
+    # Fit drift detector on the clean training features
+    state["drift_detector"].fit(X_clean.values)
+    state["drift_detector"].save()
+
     return jsonify({
-        "status": "Model trained successfully.",
+        "status": "Ensemble models trained successfully.",
         "accuracy": info["accuracy"],
         "n_samples": info["n_samples"],
         "n_features": info["n_features"],
+        "individual": info["individual"],
     })
 
 
@@ -134,15 +183,25 @@ def train():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    # Load model + meta
-    model_path = os.path.join(MODEL_DIR, "base_model.pkl")
-    meta_path  = os.path.join(MODEL_DIR, "meta.pkl")
+    # Load ensemble model + meta
+    ensemble_path = os.path.join(MODEL_DIR, "ensemble_model.pkl")
+    meta_path     = os.path.join(MODEL_DIR, "ensemble_meta.pkl")
+    scaler_path   = os.path.join(MODEL_DIR, "scaler.pkl")
 
-    if not os.path.exists(model_path):
+    # Fall back to base model if ensemble not available
+    if not os.path.exists(ensemble_path):
+        ensemble_path = os.path.join(MODEL_DIR, "base_model.pkl")
+        meta_path = os.path.join(MODEL_DIR, "meta.pkl")
+
+    if not os.path.exists(ensemble_path):
         return jsonify({"error": "No trained model found. Train first."}), 400
 
-    clf  = joblib.load(model_path)
+    clf  = joblib.load(ensemble_path)
     meta = joblib.load(meta_path)
+
+    scaler = None
+    if os.path.exists(scaler_path):
+        scaler = joblib.load(scaler_path)
 
     n_features    = meta["n_features"]
     feature_names = meta["feature_names"]
@@ -168,6 +227,10 @@ def predict():
             "model_prediction": -1,
             "decision": "BLOCK",
             "risk_score": 100,
+            "severity": "HIGH",
+            "drift_flag": False,
+            "drift_score": 0,
+            "explanation": ["Validation failed: " + "; ".join(val["errors"])],
             "details": "Validation failed: " + "; ".join(val["errors"]),
         })
 
@@ -176,29 +239,76 @@ def predict():
     if state["evasion_detector"]._fitted:
         evasion = state["evasion_detector"].predict(features)
     else:
-        # Try loading persisted model
         if state["evasion_detector"].load():
             evasion = state["evasion_detector"].predict(features)
 
-    # 3 ── Base model prediction
+    log_evasion(
+        input_summary=str(features[:3]) + "...",
+        evasion_flag=evasion["evasion_flag"],
+        decision_score=evasion["decision_score"],
+    )
+
+    # 3 ── Drift detection
+    drift = {"drift_flag": False, "drift_score": 0.0, "drifted_features": []}
+    if state["drift_detector"]._fitted:
+        drift = state["drift_detector"].detect(features)
+    else:
+        if state["drift_detector"].load():
+            drift = state["drift_detector"].detect(features)
+
+    # 4 ── Ensemble prediction
     x = np.array(features).reshape(1, -1)
-    prediction = int(clf.predict(x)[0])
+    if scaler is not None:
+        x_scaled = scaler.transform(x)
+    else:
+        x_scaled = x
+
+    prediction = int(clf.predict(x_scaled)[0])
     try:
-        proba = clf.predict_proba(x)[0]
+        proba = clf.predict_proba(x_scaled)[0]
         confidence = float(np.max(proba))
     except Exception:
         confidence = 1.0
 
-    # 4 ── Poisoning risk for this input (re-use session flag)
+    # 5 ── Risk scoring
+    evasion_risk_score = min(abs(evasion["decision_score"]) * 20, 100) if evasion["evasion_flag"] else 0.0
     poisoning_flag = False  # only meaningful during upload phase
+    poisoning_score = 100.0 if poisoning_flag else 0.0
 
-    # 5 ── Ensemble decision
+    risk_result = calculate_risk(
+        poisoning_score=poisoning_score,
+        evasion_score=evasion_risk_score,
+        drift_score=drift["drift_score"],
+        model_confidence=confidence,
+    )
+
+    # 6 ── Explainability
+    explanation_list = explain(
+        x=features,
+        training_data=state["drift_detector"].training_data if state["drift_detector"]._fitted else None,
+        feature_names=feature_names,
+    )
+
+    # 7 ── Ensemble decision
     result = ensemble_decision(
         poisoning_flag=poisoning_flag,
         evasion_flag=evasion["evasion_flag"],
         model_prediction=prediction,
         evasion_score=evasion["decision_score"],
         model_confidence=confidence,
+        drift_flag=drift["drift_flag"],
+        severity=risk_result["severity"],
+        explanation=explanation_list,
+    )
+
+    # 8 ── Log decision
+    log_decision(
+        input_summary=str(features[:3]) + "...",
+        decision=result["decision"],
+        risk_score=risk_result["risk_score"],
+        severity=risk_result["severity"],
+        drift_flag=drift["drift_flag"],
+        explanation="; ".join(explanation_list),
     )
 
     return jsonify({
@@ -207,8 +317,12 @@ def predict():
         "evasion_score": evasion["decision_score"],
         "model_prediction": prediction,
         "model_confidence": round(confidence, 4),
+        "drift_flag": drift["drift_flag"],
+        "drift_score": drift["drift_score"],
+        "risk_score": risk_result["risk_score"],
+        "severity": risk_result["severity"],
+        "explanation": explanation_list,
         "decision": result["decision"],
-        "risk_score": result["risk_score"],
         "details": result["details"],
     })
 

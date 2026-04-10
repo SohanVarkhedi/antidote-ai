@@ -16,6 +16,7 @@ const uploadStats    = $('#upload-stats');
 const statTotal      = $('#stat-total');
 const statSuspicious = $('#stat-suspicious');
 const statCleaned    = $('#stat-cleaned');
+const downloadRow    = $('#download-row');
 
 const trainBtn     = $('#train-btn');
 const trainSpinner = $('#train-spinner');
@@ -24,19 +25,27 @@ const trainStats   = $('#train-stats');
 const statAccuracy = $('#stat-accuracy');
 const statSamples  = $('#stat-samples');
 const statFeatures = $('#stat-features');
+const individualStats = $('#individual-stats');
+const statRf       = $('#stat-rf');
+const statLr       = $('#stat-lr');
+const statGb       = $('#stat-gb');
 
 const predictBtn     = $('#predict-btn');
 const predictSpinner = $('#predict-spinner');
 const extraFields    = $('#extra-fields');
 
-const outputSection = $('#output-section');
-const outPoisoning  = $('#out-poisoning');
-const outEvasion    = $('#out-evasion');
-const outPrediction = $('#out-prediction');
-const outDecision   = $('#out-decision');
-const outRiskScore  = $('#out-riskscore');
-const riskBarFill   = $('#risk-bar-fill');
-const outDetails    = $('#out-details');
+const outputSection  = $('#output-section');
+const outPoisoning   = $('#out-poisoning');
+const outEvasion     = $('#out-evasion');
+const outPrediction  = $('#out-prediction');
+const outDecision    = $('#out-decision');
+const outRiskScore   = $('#out-riskscore');
+const riskBarFill    = $('#risk-bar-fill');
+const outDetails     = $('#out-details');
+const outSeverity    = $('#out-severity');
+const outDrift       = $('#out-drift');
+const outConfidence  = $('#out-confidence');
+const outExplanation = $('#out-explanation');
 
 const toastEl = $('#toast');
 
@@ -110,6 +119,7 @@ async function handleUpload(file) {
 
     uploadSpinner.classList.add('spinner--visible');
     uploadStats.style.display = 'none';
+    downloadRow.style.display = 'none';
 
     const form = new FormData();
     form.append('file', file);
@@ -134,9 +144,12 @@ async function handleUpload(file) {
         animateNumber(statSuspicious, data.suspicious_rows);
         animateNumber(statCleaned, data.cleaned_rows);
 
+        // Show download button
+        downloadRow.style.display = 'flex';
+
         // Enable training
         trainBtn.disabled = false;
-        trainStatus.textContent = 'Ready to train.';
+        trainStatus.textContent = 'Ready to train ensemble.';
         trainStatus.className = 'train-status';
 
         showToast(`Dataset uploaded — ${data.suspicious_rows} suspicious rows removed.`, 'success');
@@ -155,9 +168,10 @@ async function handleUpload(file) {
 trainBtn.addEventListener('click', async () => {
     trainBtn.disabled = true;
     trainSpinner.classList.add('spinner--visible');
-    trainStatus.textContent = 'Training in progress…';
+    trainStatus.textContent = 'Training ensemble models…';
     trainStatus.className = 'train-status';
     trainStats.style.display = 'none';
+    individualStats.style.display = 'none';
 
     try {
         const res = await fetch(`${API}/train`, { method: 'POST' });
@@ -171,7 +185,7 @@ trainBtn.addEventListener('click', async () => {
             return;
         }
 
-        trainStatus.textContent = `Model trained — ${(data.accuracy * 100).toFixed(1)}% accuracy`;
+        trainStatus.textContent = `Ensemble trained — ${(data.accuracy * 100).toFixed(1)}% accuracy`;
         trainStatus.className = 'train-status train-status--success';
 
         statAccuracy.textContent = (data.accuracy * 100).toFixed(1) + '%';
@@ -179,11 +193,19 @@ trainBtn.addEventListener('click', async () => {
         statFeatures.textContent = data.n_features;
         trainStats.style.display = 'grid';
 
+        // Individual model accuracies
+        if (data.individual) {
+            statRf.textContent = data.individual.rf ? (data.individual.rf * 100).toFixed(1) + '%' : '—';
+            statLr.textContent = data.individual.lr ? (data.individual.lr * 100).toFixed(1) + '%' : '—';
+            statGb.textContent = data.individual.gb ? (data.individual.gb * 100).toFixed(1) + '%' : '—';
+            individualStats.style.display = 'grid';
+        }
+
         nFeatures = data.n_features;
         buildFeatureInputs(nFeatures);
 
         predictBtn.disabled = false;
-        showToast('Model trained successfully!', 'success');
+        showToast('Ensemble models trained successfully!', 'success');
     } catch (err) {
         trainStatus.textContent = 'Training failed.';
         trainStatus.className = 'train-status train-status--error';
@@ -328,16 +350,22 @@ async function animatePipeline(data) {
     data.evasion_risk ? failPipeStep('pipe-evasion') : passPipeStep('pipe-evasion');
     await delay(200);
 
-    // Model
-    activatePipeStep('pipe-model');
+    // Drift
+    activatePipeStep('pipe-drift');
     await delay(400);
-    passPipeStep('pipe-model');
+    data.drift_flag ? failPipeStep('pipe-drift') : passPipeStep('pipe-drift');
     await delay(200);
 
-    // Ensemble
+    // Ensemble Model
     activatePipeStep('pipe-ensemble');
+    await delay(400);
+    passPipeStep('pipe-ensemble');
+    await delay(200);
+
+    // Risk Scoring
+    activatePipeStep('pipe-risk');
     await delay(300);
-    data.decision === 'ALLOW' ? passPipeStep('pipe-ensemble') : failPipeStep('pipe-ensemble');
+    data.severity === 'HIGH' ? failPipeStep('pipe-risk') : passPipeStep('pipe-risk');
     await delay(200);
 
     // Output
@@ -351,6 +379,25 @@ async function animatePipeline(data) {
 // ══════════════════════════════════════════════════════════════════
 
 function renderDashboard(data) {
+    // Decision
+    outDecision.textContent = data.decision;
+    outDecision.className = 'dash-card__value decision--' + data.decision.toLowerCase();
+
+    // Risk Score
+    const risk = data.risk_score;
+    outRiskScore.textContent = `${risk} / 100`;
+    riskBarFill.style.width = `${risk}%`;
+    riskBarFill.className = 'risk-bar__fill '
+        + (risk >= 66 ? 'risk-bar__fill--high' : risk >= 33 ? 'risk-bar__fill--medium' : 'risk-bar__fill--low');
+
+    // Severity Level
+    outSeverity.textContent = data.severity || '—';
+    outSeverity.className = 'dash-card__value severity--' + (data.severity || 'low').toLowerCase();
+
+    // Drift Status
+    const driftDetected = data.drift_flag;
+    outDrift.innerHTML = boolIndicator(driftDetected);
+
     // Poisoning
     outPoisoning.innerHTML = boolIndicator(data.poisoning_risk);
 
@@ -361,16 +408,21 @@ function renderDashboard(data) {
     outPrediction.textContent = `Class ${data.model_prediction}`;
     outPrediction.style.color = data.model_prediction === 1 ? '#D02020' : '#1a8a3a';
 
-    // Decision
-    outDecision.textContent = data.decision;
-    outDecision.className = 'dash-card__value decision--' + data.decision.toLowerCase();
+    // Model Confidence
+    const conf = data.model_confidence || 0;
+    outConfidence.textContent = (conf * 100).toFixed(1) + '%';
+    outConfidence.style.color = conf >= 0.7 ? '#1a8a3a' : conf >= 0.4 ? '#b89000' : '#D02020';
 
-    // Risk Score
-    const risk = data.risk_score;
-    outRiskScore.textContent = `${risk} / 100`;
-    riskBarFill.style.width = `${risk}%`;
-    riskBarFill.className = 'risk-bar__fill '
-        + (risk >= 60 ? 'risk-bar__fill--high' : risk >= 30 ? 'risk-bar__fill--medium' : 'risk-bar__fill--low');
+    // Explanation
+    if (data.explanation && Array.isArray(data.explanation)) {
+        outExplanation.innerHTML = data.explanation.map(e => {
+            const isNormal = e === 'All features within expected range';
+            const cls = isNormal ? 'explanation-item--normal' : 'explanation-item--alert';
+            return `<div class="explanation-item ${cls}">${isNormal ? '✓' : '⚠'} ${e}</div>`;
+        }).join('');
+    } else {
+        outExplanation.textContent = '—';
+    }
 
     // Details
     outDetails.textContent = data.details || '—';

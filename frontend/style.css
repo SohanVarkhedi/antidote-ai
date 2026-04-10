@@ -489,6 +489,35 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   DOWNLOAD ROW
+   ══════════════════════════════════════════════════════════════════ */
+
+.download-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-top: 24px;
+    padding: 20px;
+    border: 3px solid var(--black);
+    background: linear-gradient(135deg, #FFFDE8 0%, #FFF8CC 100%);
+    box-shadow: 4px 4px 0px var(--black);
+    animation: slideUp 0.4s ease-out;
+}
+
+.download-hint {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #666;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ══════════════════════════════════════════════════════════════════
    STATS ROW
    ══════════════════════════════════════════════════════════════════ */
 
@@ -639,6 +668,10 @@ h1, h2, h3, h4, h5, h6 {
     transform: translate(-2px, -2px);
 }
 
+.dash-card--wide {
+    grid-column: span 2;
+}
+
 .dash-card__label {
     font-size: 0.65rem;
     font-weight: 700;
@@ -658,6 +691,11 @@ h1, h2, h3, h4, h5, h6 {
 .decision--allow { color: #1a8a3a; }
 .decision--block { color: var(--red); }
 .decision--flag  { color: var(--yellow); }
+
+/* Severity colours */
+.severity--low    { color: #1a8a3a; }
+.severity--medium { color: #b89000; }
+.severity--high   { color: var(--red); }
 
 /* Risk score visual bar */
 .risk-bar {
@@ -698,6 +736,40 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   EXPLAINABILITY
+   ══════════════════════════════════════════════════════════════════ */
+
+.explanation-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.explanation-item {
+    padding: 10px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border: 3px solid var(--black);
+    box-shadow: 3px 3px 0px var(--black);
+    transition: transform 0.15s;
+}
+
+.explanation-item:hover {
+    transform: translate(-2px, -2px);
+}
+
+.explanation-item--normal {
+    background: #e8f5e9;
+    color: #1a8a3a;
+}
+
+.explanation-item--alert {
+    background: #fff3e0;
+    color: #c45500;
+}
+
+/* ══════════════════════════════════════════════════════════════════
    PIPELINE DIAGRAM
    ══════════════════════════════════════════════════════════════════ */
 
@@ -715,8 +787,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .pipeline__step {
-    padding: 14px 18px;
-    font-size: 0.72rem;
+    padding: 14px 14px;
+    font-size: 0.68rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -725,7 +797,7 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--black);
     position: relative;
     text-align: center;
-    min-width: 70px;
+    min-width: 65px;
     transition: background 0.3s, color 0.3s;
 }
 
@@ -846,6 +918,15 @@ h1, h2, h3, h4, h5, h6 {
 
     .hero__title {
         font-size: 2.5rem;
+    }
+
+    .dash-card--wide {
+        grid-column: span 1;
+    }
+
+    .download-row {
+        flex-direction: column;
+        text-align: center;
     }
 }
 

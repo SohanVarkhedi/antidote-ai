@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Antidote AI — Adversarially Robust AI Security Middleware that protects against poisoning and evasion attacks.">
+    <meta name="description" content="Antidote AI — Adversarially Robust AI Security Middleware with ensemble models, drift detection, risk scoring, and explainability.">
     <title>ANTIDOTE AI — Adversarially Robust Security</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -39,7 +39,7 @@
             <span>ANTI</span><span>DOTE</span> <span>AI</span>
         </h1>
         <p class="hero__subtitle">Adversarially Robust AI Security Middleware</p>
-        <div class="hero__badge">■ Poisoning Defense &nbsp;·&nbsp; ▲ Evasion Detection &nbsp;·&nbsp; ● Ensemble Verdict</div>
+        <div class="hero__badge">■ Poisoning Defense &nbsp;·&nbsp; ▲ Evasion Detection &nbsp;·&nbsp; ◆ Drift Analysis &nbsp;·&nbsp; ● Ensemble Verdict</div>
     </div>
 
     <div class="hero__scroll" onclick="document.getElementById('upload-section').scrollIntoView({behavior:'smooth'})">
@@ -89,6 +89,14 @@
                     <div class="stat-card__label">Cleaned Rows</div>
                 </div>
             </div>
+
+            <!-- Download Cleaned Dataset Button -->
+            <div class="download-row" id="download-row" style="display:none;">
+                <a class="btn btn--yellow" id="download-btn" href="/download-cleaned" download>
+                    ⬇ Download Cleaned Dataset
+                </a>
+                <span class="download-hint">Cleaned CSV with suspicious rows removed</span>
+            </div>
         </div>
     </div>
 </section>
@@ -113,19 +121,19 @@
     <div class="container">
         <div class="section__header">
             <span class="section__number">02 — MODEL TRAINING</span>
-            <h2 class="section__title">Train Base Model</h2>
-            <p class="section__subtitle">Train a RandomForestClassifier on the cleaned dataset.</p>
+            <h2 class="section__title">Train Ensemble Models</h2>
+            <p class="section__subtitle">Train RandomForest, LogisticRegression, and GradientBoosting with soft-voting ensemble.</p>
         </div>
 
         <div class="card card--yellow">
             <div class="card__title">
                 <span class="card__icon card__icon--blue">●</span>
-                Model Training
+                Ensemble Training
             </div>
 
             <div class="train-area">
                 <button class="btn btn--blue" id="train-btn" disabled>
-                    ▶ Train Model
+                    ▶ Train Ensemble
                 </button>
                 <div id="train-spinner" class="spinner"></div>
                 <div class="train-status" id="train-status">
@@ -136,7 +144,7 @@
             <div class="stats-row" id="train-stats" style="display:none; margin-top:28px;">
                 <div class="stat-card stat-card--blue">
                     <div class="stat-card__value" id="stat-accuracy">—</div>
-                    <div class="stat-card__label">Accuracy</div>
+                    <div class="stat-card__label">Ensemble Accuracy</div>
                 </div>
                 <div class="stat-card stat-card--yellow">
                     <div class="stat-card__value" id="stat-samples">—</div>
@@ -145,6 +153,22 @@
                 <div class="stat-card stat-card--blue">
                     <div class="stat-card__value" id="stat-features">—</div>
                     <div class="stat-card__label">Features</div>
+                </div>
+            </div>
+
+            <!-- Individual model accuracies -->
+            <div class="stats-row" id="individual-stats" style="display:none; margin-top:16px;">
+                <div class="stat-card stat-card--green">
+                    <div class="stat-card__value" id="stat-rf">—</div>
+                    <div class="stat-card__label">RandomForest</div>
+                </div>
+                <div class="stat-card stat-card--blue">
+                    <div class="stat-card__value" id="stat-lr">—</div>
+                    <div class="stat-card__label">LogisticRegression</div>
+                </div>
+                <div class="stat-card stat-card--red">
+                    <div class="stat-card__value" id="stat-gb">—</div>
+                    <div class="stat-card__label">GradientBoosting</div>
                 </div>
             </div>
         </div>
@@ -160,7 +184,7 @@
         <div class="section__header">
             <span class="section__number">03 — INFERENCE PHASE</span>
             <h2 class="section__title">Run Defense Pipeline</h2>
-            <p class="section__subtitle">Enter feature values. The system will validate, detect evasion, predict, and issue a verdict.</p>
+            <p class="section__subtitle">Enter feature values. The system will validate, detect evasion, check drift, predict, score risk, and issue a verdict.</p>
         </div>
 
         <div class="inference-grid">
@@ -208,9 +232,11 @@
                         <span class="pipeline__arrow">→</span>
                         <div class="pipeline__step" id="pipe-evasion">Evasion<br>Detector</div>
                         <span class="pipeline__arrow">→</span>
-                        <div class="pipeline__step" id="pipe-model">Base<br>Model</div>
+                        <div class="pipeline__step" id="pipe-drift">Drift<br>Detector</div>
                         <span class="pipeline__arrow">→</span>
-                        <div class="pipeline__step" id="pipe-ensemble">Ensemble</div>
+                        <div class="pipeline__step" id="pipe-ensemble">Ensemble<br>Model</div>
+                        <span class="pipeline__arrow">→</span>
+                        <div class="pipeline__step" id="pipe-risk">Risk<br>Scoring</div>
                         <span class="pipeline__arrow">→</span>
                         <div class="pipeline__step" id="pipe-output">Output</div>
                     </div>
@@ -233,6 +259,33 @@
         </div>
 
         <div class="dashboard" id="output-dashboard">
+            <!-- Final Decision -->
+            <div class="dash-card dash-card--wide" id="dash-decision">
+                <div class="dash-card__label">Final Decision</div>
+                <div class="dash-card__value" id="out-decision" style="font-size:2.2rem;">—</div>
+            </div>
+
+            <!-- Risk Score -->
+            <div class="dash-card dash-card--wide" id="dash-risk">
+                <div class="dash-card__label">Risk Score</div>
+                <div class="dash-card__value" id="out-riskscore">—</div>
+                <div class="risk-bar">
+                    <div class="risk-bar__fill" id="risk-bar-fill" style="width:0%;"></div>
+                </div>
+            </div>
+
+            <!-- Severity Level -->
+            <div class="dash-card" id="dash-severity">
+                <div class="dash-card__label">Severity Level</div>
+                <div class="dash-card__value" id="out-severity">—</div>
+            </div>
+
+            <!-- Drift Status -->
+            <div class="dash-card" id="dash-drift">
+                <div class="dash-card__label">Drift Status</div>
+                <div class="dash-card__value" id="out-drift">—</div>
+            </div>
+
             <!-- Poisoning Risk -->
             <div class="dash-card" id="dash-poisoning">
                 <div class="dash-card__label">Poisoning Risk</div>
@@ -251,24 +304,24 @@
                 <div class="dash-card__value" id="out-prediction">—</div>
             </div>
 
-            <!-- Final Decision -->
-            <div class="dash-card" id="dash-decision">
-                <div class="dash-card__label">Final Decision</div>
-                <div class="dash-card__value" id="out-decision" style="font-size:2rem;">—</div>
-            </div>
-
-            <!-- Risk Score -->
-            <div class="dash-card" id="dash-risk" style="grid-column: span 2;">
-                <div class="dash-card__label">Risk Score</div>
-                <div class="dash-card__value" id="out-riskscore">—</div>
-                <div class="risk-bar">
-                    <div class="risk-bar__fill" id="risk-bar-fill" style="width:0%;"></div>
-                </div>
+            <!-- Model Confidence -->
+            <div class="dash-card" id="dash-confidence">
+                <div class="dash-card__label">Model Confidence</div>
+                <div class="dash-card__value" id="out-confidence">—</div>
             </div>
         </div>
 
+        <!-- Explanation detail -->
+        <div class="card" style="margin-top:28px;" id="explanation-card">
+            <div class="card__title">
+                <span class="card__icon card__icon--yellow">◆</span>
+                Explainability Report
+            </div>
+            <div class="explanation-list" id="out-explanation">—</div>
+        </div>
+
         <!-- Detail text -->
-        <div class="card" style="margin-top:28px;">
+        <div class="card" style="margin-top:20px;">
             <div class="card__title">
                 <span class="card__icon card__icon--blue">●</span>
                 Analysis Details
